@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Universal Twitch Poll Widget</title>
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    background: transparent;
+    font-family: Arial, sans-serif;
+    overflow: hidden;
+  }
+
+  #poll-container {
+    width: 100%;
+    max-width: 600px;
+    margin: auto;
+    color: red;
+    text-align: center;
+  }
+
+  #question {
+    font-size: 4vw;
+    margin-bottom: 1vh;
+    text-shadow: 2px 2px 5px rgba(0,0,0,0.6);
+  }
+
+  .option {
+    position: relative;
+    margin: 1vh 0;
+    background: rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 1vh 1vw;
+    overflow: hidden;
+  }
+
+  .option span.text {
+    position: relative;
+    z-index: 2;
+    font-size: 3vw;
+  }
+
+  .option span.percentage {
+    position: absolute;
+    right: 1vw;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    font-size: 2.5vw;
+  }
+
+  .bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0%;
+    background: #1db954;
+    border-radius: 12px;
+    transition: width 0.4s ease;
+    z-index: 1;
+  }
+
+  #timer {
+    margin-top: 2vh;
+    font-size: 3vw;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+  }
+</style>
+</head>
+<body>
+<div id="poll-container">
+  <div id="question">No active poll</div>
+  <div id="options"></div>
+  <div id="timer"></div>
+</div>
+
+<!-- TMI.js for Twitch chat -->
+<script src="https://cdn.jsdelivr.net/npm/tmi.js@1.8.5/dist/tmi.min.js"></script>
+<script>
+  // --------------------------
+  // CONFIGURATION
+  // --------------------------
+  const CHANNEL_NAME = "your_channel_here"; // Replace with your Twitch channel
+  const POLL_DURATION = 30; // Default poll time in seconds
+
+  // --------------------------
+  // STATE VARIABLES
+  // --------------------------
+  let pollActive = false;
+  let pollData = {};
+  let pollTimer;
+
+  // --------------------------
+  // CONNECT TO TWITCH CHAT
+  // --------------------------
+  const client = new tmi.Client({ channels: [ CHANNEL_NAME ] });
+  client.connect();
+
+  client.on('message', (channel, tags, message, self) => {
+    if(self) return;
+
+    // Start poll: !poll "Question" "Option1" "Option2" ...
+    if(message.startsWith('!poll ')){
+      if(pollActive) return client.say(channel, "A poll is already running!");
+      const matches = message.match(/"([^"]+)"/g);
+      if(matches && matches.length >= 3){
+        startPoll(matches.map(m => m.replace(/"/g,'')));
+      }
+    }
+
+    // Vote: !vote Option
+    if(message.startsWith('!vote ') && pollActive){
+      const vote = message.slice(6).trim();
+      if(pollData.options.includes(vote)){
+        pollData.votes[vote] = (pollData.votes[vote] || 0) + 1;
+        updatePollDisplay();
+      }
+    }
+
+    // Force end poll
+    if(message === '!endpoll' && pollActive){
+      endPoll();
+    }
+  });
+
+  // --------------------------
+  // POLL FUNCTIONS
+  // --------------------------
+  function startPoll(args){
+    const [question, ...options] = args;
+    pollActive = true;
+    pollData = { question, options, votes: {} };
+    options.forEach(opt => pollData.votes[opt] = 0);
+    updatePollDisplay();
+    startTimer(POLL_DURATION);
+  }
+
+  function updatePollDisplay(){
+    document.getElementById('question').innerText = pollData.question;
+    const optionsDiv = document.getElementById('options');
+    optionsDiv.innerHTML = '';
+
+    const totalVotes = Object.values(pollData.votes).reduce((a,b)=>a+b,0) || 1;
+
+    pollData.options.forEach(opt => {
+      const percent = ((pollData.votes[opt]/totalVotes)*100).toFixed(1);
+      const optionDiv = document.createElement('div');
+      optionDiv.className = 'option';
+      optionDiv.innerHTML = `
+        <span class="text">${opt}</span>
+        <span class="percentage">${percent}%</span>
+        <div class="bar" style="width:${percent}%"></div>
+      `;
+      optionsDiv.appendChild(optionDiv);
+    });
+  }
+
+  function startTimer(seconds){
+    const timerEl = document.getElementById('timer');
+    let remaining = seconds;
+    timerEl.innerText = `Time left: ${remaining}s`;
+    pollTimer = setInterval(()=>{
+      remaining--;
+      timerEl.innerText = `Time left: ${remaining}s`;
+      if(remaining <= 0){
+        clearInterval(pollTimer);
+        endPoll();
+      }
+    },1000);
+  }
+
+  function endPoll(){
+    pollActive = false;
+    clearInterval(pollTimer);
+    const maxVotes = Math.max(...Object.values(pollData.votes));
+    const winners = Object.keys(pollData.votes).filter(k => pollData.votes[k] === maxVotes);
+    document.getElementById('question').innerText = `Poll ended! Winner: ${winners.join(', ')}`;
+  }
+</script>
+</body>
+</html>
