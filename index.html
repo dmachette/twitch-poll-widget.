@@ -22,7 +22,7 @@
   #question {
     font-size: 4vw;
     margin-bottom: 1vh;
-    text-shadow: 2px 2px 5px rgba(0,0,0,0.6);
+    text-shadow: 2px 2px 8px rgba(0,0,0,0.7);
   }
 
   .option {
@@ -32,12 +32,15 @@
     border-radius: 12px;
     padding: 1vh 1vw;
     overflow: hidden;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
   }
 
   .option span.text {
     position: relative;
     z-index: 2;
     font-size: 3vw;
+    font-weight: bold;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
   }
 
   .option span.percentage {
@@ -47,6 +50,8 @@
     transform: translateY(-50%);
     z-index: 2;
     font-size: 2.5vw;
+    font-weight: bold;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
   }
 
   .bar {
@@ -55,16 +60,15 @@
     left: 0;
     height: 100%;
     width: 0%;
-    background: #1db954;
     border-radius: 12px;
-    transition: width 0.4s ease;
+    transition: width 0.4s ease, box-shadow 0.4s ease;
     z-index: 1;
   }
 
   #timer {
     margin-top: 2vh;
     font-size: 3vw;
-    text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+    text-shadow: 1px 1px 5px rgba(0,0,0,0.5);
   }
 </style>
 </head>
@@ -81,8 +85,11 @@
   // --------------------------
   // CONFIGURATION
   // --------------------------
-  const CHANNEL_NAME = "the_dj_machette"; // Replace with your Twitch username, lowercase
-  const POLL_DURATION = 30; // Default poll duration in seconds
+  const CHANNEL_NAME = "the_dj_machette"; // <-- Your Twitch username
+  const POLL_DURATION = 30; // Poll duration in seconds
+
+  // Color palette for options
+  const OPTION_COLORS = ["#1DB954", "#9146FF", "#FF4500", "#FFD700"];
 
   // --------------------------
   // STATE VARIABLES
@@ -143,14 +150,16 @@
 
     const totalVotes = Object.values(pollData.votes).reduce((a,b)=>a+b,0) || 1;
 
-    pollData.options.forEach(opt => {
+    pollData.options.forEach((opt, index) => {
       const percent = ((pollData.votes[opt]/totalVotes)*100).toFixed(1);
+      const color = OPTION_COLORS[index % OPTION_COLORS.length];
+
       const optionDiv = document.createElement('div');
       optionDiv.className = 'option';
       optionDiv.innerHTML = `
         <span class="text">${opt}</span>
         <span class="percentage">${percent}%</span>
-        <div class="bar" style="width:${percent}%"></div>
+        <div class="bar" style="width:${percent}%; background: ${color}; box-shadow: 0 0 10px ${color};"></div>
       `;
       optionsDiv.appendChild(optionDiv);
     });
