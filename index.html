@@ -15,11 +15,44 @@
     width: 90%;
     max-width: 700px;
     margin: auto;
-    background: rgba(0,0,0,0.5); /* semi-transparent background */
+    background: rgba(0,0,0,0.5);
     border-radius: 20px;
     padding: 20px;
     box-sizing: border-box;
     text-align: center;
+    position: relative;
+  }
+
+  /* Connection status dot */
+  #status-dot {
+    width: 15px; height: 15px;
+    border-radius: 50%;
+    background: red;
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+
+  #status-dot.online {
+    background: #1DB954;
+    box-shadow: 0 0 10px #1DB954;
+  }
+
+  #status-dot.offline {
+    background: red;
+    box-shadow: 0 0 5px red;
+  }
+
+  /* Blink animation for vote feedback */
+  @keyframes blink {
+    0% { box-shadow: 0 0 15px #1DB954; }
+    50% { box-shadow: 0 0 2px #1DB954; }
+    100% { box-shadow: 0 0 15px #1DB954; }
+  }
+
+  #status-dot.blink {
+    animation: blink 0.5s ease-in-out 2;
   }
 
   #poll-container {
@@ -81,6 +114,7 @@
 </head>
 <body>
 <div id="background">
+  <div id="status-dot" class="offline"></div> <!-- Connection status -->
   <div id="poll-container">
     <div id="question">No active poll</div>
     <div id="options"></div>
@@ -90,20 +124,48 @@
 
 <script src="tmi.min.js"></script>
 <script>
-  const CHANNEL_NAME = "the_dj_machette"; 
-  const POLL_DURATION = 30; 
+  const CHANNEL_NAME = "the_dj_machette";
+  const POLL_DURATION = 30;
   const OPTION_COLORS = ["#1DB954", "#9146FF", "#FF4500", "#FFD700"];
 
   let pollActive = false;
   let pollData = {};
   let pollTimer;
 
-  const client = new tmi.Client({ channels: [ CHANNEL_NAME ] });
-  client.connect();
+  const statusDot = document.getElementById('status-dot');
+  statusDot.classList.add('offline');
 
+  // Connect to Twitch chat
+  const client = new tmi.Client({ channels: [ CHANNEL_NAME ] });
+
+  client.connect()
+    .then(() => {
+      console.log('Connected to Twitch chat!');
+      statusDot.classList.remove('offline');
+      statusDot.classList.add('online');
+    })
+    .catch((err) => {
+      console.error('Failed to connect:', err);
+      statusDot.classList.remove('online');
+      statusDot.classList.add('offline');
+    });
+
+  client.on('disconnected', (reason) => {
+      console.log('Disconnected:', reason);
+      statusDot.classList.remove('online');
+      statusDot.classList.add('offline');
+  });
+
+  client.on('reconnect', () => {
+      console.log('Reconnecting...');
+      statusDot.classList.add('offline');
+  });
+
+  // Chat commands
   client.on('message', (channel, tags, message, self) => {
     if(self) return;
 
+    // Start poll
     if(message.startsWith('!poll ')){
       if(pollActive) return client.say(channel, "A poll is already running!");
       const matches = message.match(/"([^"]+)"/g);
@@ -112,19 +174,26 @@
       }
     }
 
+    // Vote
     if(message.startsWith('!vote ') && pollActive){
       const vote = message.slice(6).trim();
       if(pollData.options.includes(vote)){
         pollData.votes[vote] = (pollData.votes[vote] || 0) + 1;
         updatePollDisplay();
+
+        // Blink status dot to indicate vote received
+        statusDot.classList.add('blink');
+        setTimeout(() => statusDot.classList.remove('blink'), 1200);
       }
     }
 
+    // End poll
     if(message === '!endpoll' && pollActive){
       endPoll();
     }
   });
 
+  // Poll functions
   function startPoll(args){
     const [question, ...options] = args;
     pollActive = true;
