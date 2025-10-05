@@ -11,12 +11,19 @@
     overflow: hidden;
   }
 
-  #poll-container {
-    width: 100%;
-    max-width: 600px;
+  #background {
+    width: 90%;
+    max-width: 700px;
     margin: auto;
-    color: #fff;
+    background: rgba(0,0,0,0.5); /* semi-transparent background */
+    border-radius: 20px;
+    padding: 20px;
+    box-sizing: border-box;
     text-align: center;
+  }
+
+  #poll-container {
+    color: #fff;
   }
 
   #question {
@@ -73,41 +80,30 @@
 </style>
 </head>
 <body>
-<div id="poll-container">
-  <div id="question">No active poll</div>
-  <div id="options"></div>
-  <div id="timer"></div>
+<div id="background">
+  <div id="poll-container">
+    <div id="question">No active poll</div>
+    <div id="options"></div>
+    <div id="timer"></div>
+  </div>
 </div>
 
-<!-- Local TMI.js -->
 <script src="tmi.min.js"></script>
 <script>
-  // --------------------------
-  // CONFIGURATION
-  // --------------------------
-  const CHANNEL_NAME = "the_dj_machette"; // <-- Your Twitch username
-  const POLL_DURATION = 30; // Poll duration in seconds
-
-  // Color palette for options
+  const CHANNEL_NAME = "the_dj_machette"; 
+  const POLL_DURATION = 30; 
   const OPTION_COLORS = ["#1DB954", "#9146FF", "#FF4500", "#FFD700"];
 
-  // --------------------------
-  // STATE VARIABLES
-  // --------------------------
   let pollActive = false;
   let pollData = {};
   let pollTimer;
 
-  // --------------------------
-  // CONNECT TO TWITCH CHAT
-  // --------------------------
   const client = new tmi.Client({ channels: [ CHANNEL_NAME ] });
   client.connect();
 
   client.on('message', (channel, tags, message, self) => {
     if(self) return;
 
-    // Start poll: !poll "Question" "Option1" "Option2" ...
     if(message.startsWith('!poll ')){
       if(pollActive) return client.say(channel, "A poll is already running!");
       const matches = message.match(/"([^"]+)"/g);
@@ -116,7 +112,6 @@
       }
     }
 
-    // Vote: !vote Option
     if(message.startsWith('!vote ') && pollActive){
       const vote = message.slice(6).trim();
       if(pollData.options.includes(vote)){
@@ -125,15 +120,11 @@
       }
     }
 
-    // Force end poll
     if(message === '!endpoll' && pollActive){
       endPoll();
     }
   });
 
-  // --------------------------
-  // POLL FUNCTIONS
-  // --------------------------
   function startPoll(args){
     const [question, ...options] = args;
     pollActive = true;
