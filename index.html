@@ -15,7 +15,7 @@
     width: 100%;
     max-width: 600px;
     margin: auto;
-    color: red;
+    color: #fff;
     text-align: center;
   }
 
@@ -75,14 +75,14 @@
   <div id="timer"></div>
 </div>
 
-<!-- TMI.js for Twitch chat -->
-<script src="https://cdn.jsdelivr.net/npm/tmi.js@1.8.5/dist/tmi.min.js"></script>
+<!-- Local TMI.js -->
+<script src="tmi.min.js"></script>
 <script>
   // --------------------------
   // CONFIGURATION
   // --------------------------
-  const CHANNEL_NAME = "your_channel_here"; // Replace with your Twitch channel
-  const POLL_DURATION = 30; // Default poll time in seconds
+  const CHANNEL_NAME = "your_channel_here"; // Replace with your Twitch username, lowercase
+  const POLL_DURATION = 30; // Default poll duration in seconds
 
   // --------------------------
   // STATE VARIABLES
