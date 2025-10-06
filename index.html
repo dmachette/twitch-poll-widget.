@@ -1,251 +1,140 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Universal Twitch Poll Widget</title>
-<style>
-  html, body {
-    margin: 0; padding: 0;
-    background: transparent;
-    font-family: Arial, sans-serif;
-    overflow: hidden;
-  }
+  <meta charset="UTF-8" />
+  <title>Twitch Poll Widget</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      margin: 0;
+      padding: 10px;
+      overflow: hidden;
+    }
 
-  #background {
-    width: 90%;
-    max-width: 700px;
-    margin: auto;
-    background: rgba(0,0,0,0.5);
-    border-radius: 20px;
-    padding: 20px;
-    box-sizing: border-box;
-    text-align: center;
-    position: relative;
-  }
+    .poll-container {
+      width: 350px;
+      min-height: 250px;
+      border: 2px solid #6a0dad;
+      border-radius: 12px;
+      background: rgba(20, 20, 20, 0.85);
+      box-shadow: 0 0 20px #6a0dad88;
+      padding: 16px;
+      position: relative;
+    }
 
-  /* Connection status dot */
-  #status-dot {
-    width: 15px; height: 15px;
-    border-radius: 50%;
-    background: red;
-    position: absolute;
-    top: 15px;
-    right: 15px;
-    transition: background 0.3s, box-shadow 0.3s;
-  }
+    .status {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.9em;
+    }
 
-  #status-dot.online {
-    background: #1DB954;
-    box-shadow: 0 0 10px #1DB954;
-  }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: red;
+      transition: background 0.3s ease;
+    }
 
-  #status-dot.offline {
-    background: red;
-    box-shadow: 0 0 5px red;
-  }
+    .dot.online {
+      background: limegreen;
+      box-shadow: 0 0 6px lime;
+    }
 
-  /* Blink animation for vote feedback */
-  @keyframes blink {
-    0% { box-shadow: 0 0 15px #1DB954; }
-    50% { box-shadow: 0 0 2px #1DB954; }
-    100% { box-shadow: 0 0 15px #1DB954; }
-  }
+    .log {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      padding: 8px;
+      margin-top: 12px;
+      font-size: 0.8em;
+      max-height: 100px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
 
-  #status-dot.blink {
-    animation: blink 0.5s ease-in-out 2;
-  }
-
-  #poll-container {
-    color: #fff;
-  }
-
-  #question {
-    font-size: 4vw;
-    margin-bottom: 1vh;
-    text-shadow: 2px 2px 8px rgba(0,0,0,0.7);
-  }
-
-  .option {
-    position: relative;
-    margin: 1vh 0;
-    background: rgba(255,255,255,0.1);
-    border-radius: 12px;
-    padding: 1vh 1vw;
-    overflow: hidden;
-    box-shadow: 0 0 10px rgba(0,0,0,0.5);
-  }
-
-  .option span.text {
-    position: relative;
-    z-index: 2;
-    font-size: 3vw;
-    font-weight: bold;
-    text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
-  }
-
-  .option span.percentage {
-    position: absolute;
-    right: 1vw;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 2;
-    font-size: 2.5vw;
-    font-weight: bold;
-    text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
-  }
-
-  .bar {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    width: 0%;
-    border-radius: 12px;
-    transition: width 0.4s ease, box-shadow 0.4s ease;
-    z-index: 1;
-  }
-
-  #timer {
-    margin-top: 2vh;
-    font-size: 3vw;
-    text-shadow: 1px 1px 5px rgba(0,0,0,0.5);
-  }
-</style>
+    .title {
+      font-size: 1.3em;
+      font-weight: bold;
+      margin-bottom: 8px;
+      text-align: center;
+      color: #b388ff;
+    }
+  </style>
 </head>
 <body>
-<div id="background">
-  <div id="status-dot" class="offline"></div> <!-- Connection status -->
-  <div id="poll-container">
-    <div id="question">No active poll</div>
-    <div id="options"></div>
-    <div id="timer"></div>
+  <div class="poll-container">
+    <div class="status">
+      <div id="statusDot" class="dot"></div>
+      <span id="statusText">Offline</span>
+    </div>
+    <div class="title">Twitch Poll Widget</div>
+    <div id="pollContent">Waiting for poll commands...</div>
+    <div id="log" class="log"></div>
   </div>
-</div>
 
-<script src="tmi.min.js"></script>
-<script>
-  const CHANNEL_NAME = "the_dj_machette";
-  const POLL_DURATION = 30;
-  const OPTION_COLORS = ["#1DB954", "#9146FF", "#FF4500", "#FFD700"];
+  <!-- Local tmi.js -->
+  <script src="./tmi.min.js"></script>
+  <script>
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const logBox = document.getElementById('log');
 
-  let pollActive = false;
-  let pollData = {};
-  let pollTimer;
+    function log(msg) {
+      console.log(msg);
+      logBox.textContent += msg + "\n";
+      logBox.scrollTop = logBox.scrollHeight;
+    }
 
-  const statusDot = document.getElementById('status-dot');
-  statusDot.classList.add('offline');
+    function setStatus(online) {
+      if (online) {
+        statusDot.classList.add('online');
+        statusText.textContent = 'Online';
+      } else {
+        statusDot.classList.remove('online');
+        statusText.textContent = 'Offline';
+      }
+    }
 
-  // Connect to Twitch chat
-  const client = new tmi.Client({ channels: [ CHANNEL_NAME ] });
-
-  client.connect()
-    .then(() => {
-      console.log('Connected to Twitch chat!');
-      statusDot.classList.remove('offline');
-      statusDot.classList.add('online');
-    })
-    .catch((err) => {
-      console.error('Failed to connect:', err);
-      statusDot.classList.remove('online');
-      statusDot.classList.add('offline');
+    const client = new tmi.Client({
+      connection: { reconnect: true, secure: true },
+      channels: ['the_dj_machette']
     });
 
-  client.on('disconnected', (reason) => {
-      console.log('Disconnected:', reason);
-      statusDot.classList.remove('online');
-      statusDot.classList.add('offline');
-  });
+    client.connect();
 
-  client.on('reconnect', () => {
-      console.log('Reconnecting...');
-      statusDot.classList.add('offline');
-  });
-
-  // Chat commands
-  client.on('message', (channel, tags, message, self) => {
-    if(self) return;
-
-    // Start poll
-    if(message.startsWith('!poll ')){
-      if(pollActive) return client.say(channel, "A poll is already running!");
-      const matches = message.match(/"([^"]+)"/g);
-      if(matches && matches.length >= 3){
-        startPoll(matches.map(m => m.replace(/"/g,'')));
-      }
-    }
-
-    // Vote
-    if(message.startsWith('!vote ') && pollActive){
-      const vote = message.slice(6).trim();
-      if(pollData.options.includes(vote)){
-        pollData.votes[vote] = (pollData.votes[vote] || 0) + 1;
-        updatePollDisplay();
-
-        // Blink status dot to indicate vote received
-        statusDot.classList.add('blink');
-        setTimeout(() => statusDot.classList.remove('blink'), 1200);
-      }
-    }
-
-    // End poll
-    if(message === '!endpoll' && pollActive){
-      endPoll();
-    }
-  });
-
-  // Poll functions
-  function startPoll(args){
-    const [question, ...options] = args;
-    pollActive = true;
-    pollData = { question, options, votes: {} };
-    options.forEach(opt => pollData.votes[opt] = 0);
-    updatePollDisplay();
-    startTimer(POLL_DURATION);
-  }
-
-  function updatePollDisplay(){
-    document.getElementById('question').innerText = pollData.question;
-    const optionsDiv = document.getElementById('options');
-    optionsDiv.innerHTML = '';
-
-    const totalVotes = Object.values(pollData.votes).reduce((a,b)=>a+b,0) || 1;
-
-    pollData.options.forEach((opt, index) => {
-      const percent = ((pollData.votes[opt]/totalVotes)*100).toFixed(1);
-      const color = OPTION_COLORS[index % OPTION_COLORS.length];
-
-      const optionDiv = document.createElement('div');
-      optionDiv.className = 'option';
-      optionDiv.innerHTML = `
-        <span class="text">${opt}</span>
-        <span class="percentage">${percent}%</span>
-        <div class="bar" style="width:${percent}%; background: ${color}; box-shadow: 0 0 10px ${color};"></div>
-      `;
-      optionsDiv.appendChild(optionDiv);
+    client.on('connected', (addr, port) => {
+      setStatus(true);
+      log(`✅ Connected to Twitch IRC at ${addr}:${port}`);
     });
-  }
 
-  function startTimer(seconds){
-    const timerEl = document.getElementById('timer');
-    let remaining = seconds;
-    timerEl.innerText = `Time left: ${remaining}s`;
-    pollTimer = setInterval(()=>{
-      remaining--;
-      timerEl.innerText = `Time left: ${remaining}s`;
-      if(remaining <= 0){
-        clearInterval(pollTimer);
-        endPoll();
+    client.on('disconnected', reason => {
+      setStatus(false);
+      log(`❌ Disconnected: ${reason}`);
+    });
+
+    client.on('reconnect', () => {
+      log(`🔄 Reconnecting to Twitch...`);
+    });
+
+    client.on('message', (channel, tags, message, self) => {
+      if (self) return;
+      log(`${tags['display-name']}: ${message}`);
+      // Example: Detect poll commands
+      if (message.toLowerCase().startsWith('!poll')) {
+        document.getElementById('pollContent').textContent = message;
       }
-    },1000);
-  }
+    });
 
-  function endPoll(){
-    pollActive = false;
-    clearInterval(pollTimer);
-    const maxVotes = Math.max(...Object.values(pollData.votes));
-    const winners = Object.keys(pollData.votes).filter(k => pollData.votes[k] === maxVotes);
-    document.getElementById('question').innerText = `Poll ended! Winner: ${winners.join(', ')}`;
-  }
-</script>
+    client.on('error', (err) => {
+      log(`💀 Error: ${err.message}`);
+      setStatus(false);
+    });
+  </script>
 </body>
 </html>
