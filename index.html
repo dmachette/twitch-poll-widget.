@@ -65,6 +65,11 @@
       text-align: center;
       color: #b388ff;
     }
+
+    #statusText span {
+      font-weight: bold;
+      color: #a9ffb7;
+    }
   </style>
 </head>
 <body>
@@ -81,6 +86,8 @@
   <!-- Local tmi.js -->
   <script src="./tmi.min.js"></script>
   <script>
+    const CHANNEL_NAME = "the_dj_machette"; // ✅ your Twitch name
+
     const statusDot = document.getElementById('statusDot');
     const statusText = document.getElementById('statusText');
     const logBox = document.getElementById('log');
@@ -91,50 +98,64 @@
       logBox.scrollTop = logBox.scrollHeight;
     }
 
-    function setStatus(online) {
+    function setStatus(online, name) {
       if (online) {
         statusDot.classList.add('online');
-        statusText.textContent = 'Online';
+        statusText.innerHTML = `Online — <span>${name}</span>`;
       } else {
         statusDot.classList.remove('online');
         statusText.textContent = 'Offline';
       }
     }
 
-    const client = new tmi.Client({
-      connection: { reconnect: true, secure: true },
-      channels: ['the_dj_machette']
-    });
+    let client;
+    try {
+      client = new tmi.Client({
+        connection: { reconnect: true, secure: true },
+        channels: [CHANNEL_NAME]
+      });
+    } catch (e) {
+      log("⚠️ Failed to create TMI client: " + e.message);
+    }
 
-    client.connect();
+    if (client) {
+      client.connect().catch(err => {
+        log(`💀 Error connecting: ${err.message}`);
+        setStatus(false);
+      });
 
-    client.on('connected', (addr, port) => {
-      setStatus(true);
-      log(`✅ Connected to Twitch IRC at ${addr}:${port}`);
-    });
+      client.on('connected', (addr, port) => {
+        const username = client.getUsername() || 'anonymous';
+        setStatus(true, username);
+        log(`✅ Connected to Twitch IRC (${addr}:${port}) as ${username}`);
+      });
 
-    client.on('disconnected', reason => {
+      client.on('disconnected', reason => {
+        setStatus(false);
+        log(`❌ Disconnected: ${reason}`);
+      });
+
+      client.on('reconnect', () => {
+        log(`🔄 Reconnecting to Twitch...`);
+      });
+
+      client.on('message', (channel, tags, message, self) => {
+        if (self) return;
+        log(`${tags['display-name']}: ${message}`);
+
+        if (message.toLowerCase().startsWith('!poll')) {
+          document.getElementById('pollContent').textContent = message;
+        }
+      });
+
+      client.on('error', err => {
+        log(`💀 Error: ${err.message}`);
+        setStatus(false);
+      });
+    } else {
       setStatus(false);
-      log(`❌ Disconnected: ${reason}`);
-    });
-
-    client.on('reconnect', () => {
-      log(`🔄 Reconnecting to Twitch...`);
-    });
-
-    client.on('message', (channel, tags, message, self) => {
-      if (self) return;
-      log(`${tags['display-name']}: ${message}`);
-      // Example: Detect poll commands
-      if (message.toLowerCase().startsWith('!poll')) {
-        document.getElementById('pollContent').textContent = message;
-      }
-    });
-
-    client.on('error', (err) => {
-      log(`💀 Error: ${err.message}`);
-      setStatus(false);
-    });
+      log("❌ TMI.js client was not created.");
+    }
   </script>
 </body>
 </html>
